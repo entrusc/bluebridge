@@ -1,0 +1,71 @@
+name: Build firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+      SDK_VERSION: "2.1.1"
+      # Tags and branches keep their name; PR artifacts must not contain "/".
+      ARTIFACT: bluebridge-${{ github.event_name == 'pull_request' && 'pr' || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Fetch Raspberry Pi Pico SDK
+        run: >
+          git clone --depth 1 --branch "$SDK_VERSION"
+          --recurse-submodules --shallow-submodules
+          https://github.com/raspberrypi/pico-sdk "$PICO_SDK_PATH"
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: build/bluebridge.uf2
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      ARTIFACT: bluebridge-${{ github.ref_name }}
+    steps:
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT }}
+
+      - name: Publish release with firmware attached
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASSET: bluebridge-${{ github.ref_name }}.uf2
+        run: |
+          mv bluebridge.uf2 "$ASSET"
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "Bluebridge $GITHUB_REF_NAME" --generate-notes "$ASSET" ||
+            gh release upload "$GITHUB_REF_NAME" "$ASSET" --clobber

@@ -1,5 +1,7 @@
 # Bluebridge
 
+[![Build firmware](https://github.com/entrusc/bluebridge/actions/workflows/build.yml/badge.svg)](https://github.com/entrusc/bluebridge/actions/workflows/build.yml)
+
 Use an Iomega ZIP 100 **parallel-port** drive on any modern computer over USB.
 
 ## What it is
@@ -50,6 +52,11 @@ export PICO_SDK_PATH=~/pico/pico-sdk
 cmake -B build -G Ninja                      # PICO_BOARD defaults to pico_w
 ninja -C build
 ```
+
+Don't want to build? Grab a prebuilt `bluebridge.uf2` from the latest
+[release](../../releases), or from the artifacts of any
+[workflow run](../../actions/workflows/build.yml). Pushing a `v*` tag
+publishes a release with the firmware attached automatically.
 
 ## Flashing
 
